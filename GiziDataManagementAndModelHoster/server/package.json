@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "@hapi/hapi": "^21.4.0",
+    "@hapi/inert": "^7.1.0",
+    "archiver": "^7.0.1",
+    "axios": "^1.9.0",
+    "fs-extra": "^11.3.0",
+    "googleapis": "^149.0.0",
+    "sqlite3": "^5.1.7",
+    "uuid": "^11.1.0",
+    "yauzl": "^3.2.0"
+  }
+}

@@ -1,0 +1,7 @@
+database.sqlite
+training_uploads
+temp_extract
+training_zips
+training_uploads
+node_modules
+models

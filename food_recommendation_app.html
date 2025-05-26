@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indonesian Food Recommendation System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.22.0/tf.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f8f9fa;
+        }
+        
+        .card {
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.08);
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
+        }
+        
+        .progress-bar {
+            height: 10px;
+            border-radius: 5px;
+            transition: width 1s ease-in-out;
+        }
+        
+        .btn-gradient {
+            background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-gradient:hover {
+            background: linear-gradient(135deg, #43A047 0%, #7CB342 100%);
+            transform: translateY(-2px);
+        }
+        
+        .macro-pill {
+            border-radius: 999px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .recommendation-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+        
+        .recommendation-card:hover {
+            border-left-color: #4CAF50;
+        }
+        
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        .animate-ping {
+            animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+        
+        @keyframes ping {
+            75%, 100% {
+                transform: scale(1.2);
+                opacity: 0;
+            }
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 10px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        .food-icon {
+            font-size: 1.5rem;
+            margin-right: 0.5rem;
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .health-status {
+            position: relative;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .health-status::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            border-radius: 4px 0 0 4px;
+        }
+        
+        .health-status.excellent::before {
+            background-color: #4CAF50;
+        }
+        
+        .health-status.good::before {
+            background-color: #8BC34A;
+        }
+        
+        .health-status.moderate::before {
+            background-color: #FFC107;
+        }
+        
+        .health-status.poor::before {
+            background-color: #FF9800;
+        }
+        
+        .health-status.critical::before {
+            background-color: #F44336;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(76, 175, 80, 0.2);
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-md">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center">
+                <i class="fas fa-leaf text-green-500 text-2xl mr-2"></i>
+                <h1 class="text-xl font-bold text-gray-800">Indonesian Food Tracker</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button id="add-food-btn" class="btn-gradient px-4 py-2 rounded-full text-white flex items-center">
+                    <i class="fas fa-plus mr-2"></i> Add Food
+                </button>
+                <div class="relative">
+                    <button id="user-profile" class="flex items-center focus:outline-none">
+                        <div class="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white">
+                            <i class="fas fa-user"></i>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- Profile and Location Section -->
+        <div class="mb-8 bg-white rounded-2xl shadow-md p-6">
+            <div class="flex flex-col md:flex-row items-start md:items-center justify-between">
+                <div class="flex items-center mb-4 md:mb-0">
+                    <div class="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center text-white text-2xl mr-4">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800">Welcome, <span id="user-name">User</span>!</h2>
+                        <p class="text-gray-600">Let's track your nutritional intake today</p>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <i class="fas fa-map-marker-alt text-red-500 mr-2"></i>
+                    <div class="relative">
+                        <select id="user-location" class="bg-gray-100 border border-gray-300 rounded-full px-4 py-2 pr-8 appearance-none focus:outline-none focus:ring-2 focus:ring-green-500">
+                            <option value="Jakarta">Jakarta</option>
+                            <option value="Bali">Bali</option>
+                            <option value="Yogyakarta">Yogyakarta</option>
+                            <option value="Surabaya">Surabaya</option>
+                            <option value="Bandung">Bandung</option>
+                            <option value="Medan">Medan</option>
+                            <option value="Makassar">Makassar</option>
+                            <option value="Palembang">Palembang</option>
+                            <option value="Semarang">Semarang</option>
+                            <option value="Padang">Padang</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Date Selector and Summary -->
+        <div class="mb-8 flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+            <!-- Date Selector -->
+            <div class="w-full md:w-1/3 bg-white rounded-2xl shadow-md p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Select Date</h3>
+                    <button id="today-btn" class="bg-green-100 text-green-600 px-3 py-1 rounded-full text-sm font-medium">Today</button>
+                </div>
+                <div class="flex justify-between items-center">
+                    <button id="prev-day" class="text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <div id="current-date" class="text-xl font-bold text-gray-800">May 18, 2025</div>
+                    <button id="next-day" class="text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Daily Summary -->
+            <div class="w-full md:w-2/3 bg-white rounded-2xl shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Daily Nutrition Summary</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-green-50 rounded-xl p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="text-sm font-medium text-gray-600">Calories</div>
+                            <div class="macro-pill bg-green-100 text-green-700">
+                                <span id="calories-consumed">0</span>/<span id="calories-target">2000</span> kcal
+                            </div>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="calories-progress" class="progress-bar bg-green-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="bg-blue-50 rounded-xl p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="text-sm font-medium text-gray-600">Protein</div>
+                            <div class="macro-pill bg-blue-100 text-blue-700">
+                                <span id="protein-consumed">0</span>/<span id="protein-target">56</span> g
+                            </div>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="protein-progress" class="progress-bar bg-blue-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="bg-yellow-50 rounded-xl p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="text-sm font-medium text-gray-600">Carbs</div>
+                            <div class="macro-pill bg-yellow-100 text-yellow-700">
+                                <span id="carbs-consumed">0</span>/<span id="carbs-target">275</span> g
+                            </div>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="carbs-progress" class="progress-bar bg-yellow-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Health Assessment and Food Origin -->
+        <div class="mb-8 flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+            <!-- Health Assessment -->
+            <div class="w-full md:w-1/2 bg-white rounded-2xl shadow-md p-6">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-heartbeat text-red-500 mr-2"></i>
+                    <h3 class="text-lg font-semibold text-gray-800">Health Assessment</h3>
+                </div>
+                <div id="health-status" class="health-status good bg-gray-50 mb-4">
+                    <div class="flex items-center mb-2">
+                        <div id="health-icon" class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-500 mr-3">
+                            <i class="fas fa-check"></i>
+                        </div>
+                        <div>
+                            <h4 id="health-title" class="font-semibold text-gray-800">Your diet looks good!</h4>
+                            <p id="health-description" class="text-sm text-gray-600">Your nutritional balance is within healthy ranges.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-sm font-medium text-gray-600 mb-1">Balanced Diet Score</div>
+                        <div class="flex items-center">
+                            <div id="balance-score" class="text-xl font-bold text-gray-800 mr-2">85</div>
+                            <div class="text-xs text-green-600">
+                                <i class="fas fa-arrow-up"></i> Good
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-sm font-medium text-gray-600 mb-1">Nutrient Variety</div>
+                        <div class="flex items-center">
+                            <div id="variety-score" class="text-xl font-bold text-gray-800 mr-2">72</div>
+                            <div class="text-xs text-yellow-600">
+                                <i class="fas fa-minus"></i> Average
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Food Origin -->
+            <div class="w-full md:w-1/2 bg-white rounded-2xl shadow-md p-6">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-globe-asia text-blue-500 mr-2"></i>
+                    <h3 class="text-lg font-semibold text-gray-800">Food Origin Analysis</h3>
+                </div>
+                <div class="mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="text-sm font-medium text-gray-600">Local Foods</div>
+                        <div id="local-percentage" class="text-sm font-medium text-green-600">0%</div>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="local-progress" class="progress-bar bg-green-500" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div id="origin-chart-container" class="h-48">
+                    <canvas id="origin-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Food Log and Recommendations -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Today's Food Log -->
+            <div class="lg:col-span-1 bg-white rounded-2xl shadow-md p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center">
+                        <i class="fas fa-utensils text-orange-500 mr-2"></i>
+                        <h3 class="text-lg font-semibold text-gray-800">Today's Food Log</h3>
+                    </div>
+                    <div class="text-sm font-medium text-gray-600">
+                        Total: <span id="total-items">0</span> items
+                    </div>
+                </div>
+                <div id="food-log-container" class="max-h-96 overflow-y-auto custom-scrollbar">
+                    <div id="food-log-empty" class="text-center py-8 text-gray-500">
+                        <i class="fas fa-clipboard-list text-4xl mb-2"></i>
+                        <p>No food items logged for today</p>
+                        <button id="log-food-btn" class="mt-2 btn-gradient px-4 py-2 rounded-full text-white flex items-center mx-auto">
+                            <i class="fas fa-plus mr-2"></i> Add Food
+                        </button>
+                    </div>
+                    <div id="food-log-list" class="hidden space-y-3"></div>
+                </div>
+            </div>
+            
+            <!-- Food Recommendations -->
+            <div class="lg:col-span-2 bg-white rounded-2xl shadow-md p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center">
+                        <div class="relative">
+                            <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
+                            <div class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800">Personalized Recommendations</h3>
+                    </div>
+                    <button id="refresh-recommendations" class="text-green-500 hover:text-green-600">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div id="recommendations-loading" class="hidden py-12 flex justify-center items-center">
+                    <div class="spinner"></div>
+                </div>
+                <div id="recommendations-container" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                <div id="recommendations-empty" class="text-center py-8 text-gray-500">
+                    <i class="fas fa-search text-4xl mb-2"></i>
+                    <p>Add some food items to get personalized recommendations</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weekly Analysis -->
+        <div class="mb-8 bg-white rounded-2xl shadow-md p-6">
+            <div class="flex items-center mb-6">
+                <i class="fas fa-chart-line text-purple-500 mr-2"></i>
+                <h3 class="text-lg font-semibold text-gray-800">Weekly Nutrition Analysis</h3>
+            </div>
+            <div class="h-64">
+                <canvas id="weekly-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Nutritional Details -->
+        <div class="bg-white rounded-2xl shadow-md p-6 mb-8">
+            <div class="flex items-center mb-6">
+                <i class="fas fa-list-alt text-blue-500 mr-2"></i>
+                <h3 class="text-lg font-semibold text-gray-800">Detailed Nutritional Breakdown</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white">
+                    <thead>
+                        <tr>
+                            <th class="py-3 px-4 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nutrient</th>
+                            <th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Consumed</th>
+                            <th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Goal</th>
+                            <th class="py-3 px-4 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody id="nutrition-table-body" class="divide-y divide-gray-200">
+                        <!-- Will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white py-6">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <div class="flex items-center">
+                        <i class="fas fa-leaf text-green-500 text-xl mr-2"></i>
+                        <span class="font-semibold text-gray-800">Indonesian Food Tracker</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-1">Making nutrition tracking culturally relevant</p>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="#" class="text-gray-600 hover:text-green-500">
+                        <i class="fab fa-facebook"></i>
+                    </a>
+                    <a href="#" class="text-gray-600 hover:text-green-500">
+                        <i class="fab fa-twitter"></i>
+                    </a>
+                    <a href="#" class="text-gray-600 hover:text-green-500">
+                        <i class="fab fa-instagram"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="mt-4 text-center text-sm text-gray-600">
+                © 2025 Indonesian Food Tracker. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Add Food Modal -->
+    <div id="add-food-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl w-full max-w-md p-6 transform transition-all animate-fade-in">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Add Food Item</h3>
+                    <button id="close-modal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="mb-4">
+                    <label for="food-search" class="block text-sm font-medium text-gray-700 mb-1">Search Food</label>
+                    <div class="relative">
+                        <input type="text" id="food-search" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Start typing to search...">
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="search-results" class="max-h-60 overflow-y-auto custom-scrollbar hidden">
+                    <!-- Search results will be populated here -->
+                </div>
+
+                <div id="selected-food" class="mb-4 hidden">
+                    <div class="p-3 bg-green-50 rounded-lg">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-500 mr-3">
+                                <i class="fas fa-utensils"></i>
+                            </div>
+                            <div>
+                                <h4 id="selected-food-name" class="font-medium text-gray-800">-</h4>
+                                <p id="selected-food-details" class="text-xs text-gray-600">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="quantity-selector" class="mb-4 hidden">
+                    <label for="food-quantity" class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                    <div class="flex items-center">
+                        <button id="decrease-quantity" class="px-3 py-1 bg-gray-200 rounded-l-lg hover:bg-gray-300">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <input type="number" id="food-quantity" value="1" min="0.25" step="0.25" class="w-20 text-center py-1 border-t border-b border-gray-300 focus:outline-none">
+                        <button id="increase-quantity" class="px-3 py-1 bg-gray-200 rounded-r-lg hover:bg-gray-300">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <div class="ml-2 text-sm text-gray-600">serving(s)</div>
+                    </div>
+                </div>
+
+                <div id="nutrition-preview" class="mb-4 hidden">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">Nutrition Preview</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <div class="text-xs text-gray-500">Calories</div>
+                            <div id="preview-calories" class="font-medium">-</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <div class="text-xs text-gray-500">Protein</div>
+                            <div id="preview-protein" class="font-medium">-</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <div class="text-xs text-gray-500">Carbs</div>
+                            <div id="preview-carbs" class="font-medium">-</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <div class="text-xs text-gray-500">Fat</div>
+                            <div id="preview-fat" class="font-medium">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button id="cancel-add-food" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button id="confirm-add-food" class="px-4 py-2 btn-gradient rounded-lg text-white">Add Food</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script -->
+    <script>
+        // Set up global variables
+        let model;
+        let X_scaler;
+        let y_scaler;
+        let nutritionalCols;
+        let dailyRequirements;
+        let foodDatabase = [];
+        let currentFoods = [];
+        let currentDate = new Date();
+        let username = "User";
+        let userLocation = "Jakarta";
+        let foodHistory = {};
+        
+        // Daily requirements
+        const DEFAULT_DAILY_REQUIREMENTS = {
+            'kalori (kkal)': 2000,
+            'protein (g)': 56,
+            'karbohidrat (g)': 275,
+            'lemak (g)': 78,
+            'lemak jenuh (g)': 22,
+            'lemak tak jenuh ganda (g)': 18,
+            'lemak tak jenuh tunggal (g)': 25, 
+            'kolesterol (mg)': 300,
+            'serat (g)': 28,
+            'gula (g)': 50,
+            'sodium (mg)': 2300,
+            'kalium (mg)': 3500
+        };
+        
+        // Sample food database for demonstration
+        const sampleFoodDatabase = [
+            {
+                id: 1,
+                nama_makanan: "Nasi Goreng",
+                label_daerah: "Region: General; Umum di: Indonesia",
+                region: "General",
+                availability: "Indonesia",
+                origin: "Indonesia",
+                is_general: 1,
+                "kalori (kkal)": 267,
+                "protein (g)": 6.8,
+                "karbohidrat (g)": 45.6,
+                "lemak (g)": 6.2,
+                "lemak jenuh (g)": 1.5,
+                "lemak tak jenuh ganda (g)": 2.1,
+                "lemak tak jenuh tunggal (g)": 2.6,
+                "kolesterol (mg)": 48,
+                "serat (g)": 1.3,
+                "gula (g)": 1.2,
+                "sodium (mg)": 580,
+                "kalium (mg)": 178
+            },
+            {
+                id: 2,
+                nama_makanan: "Gado-gado",
+                label_daerah: "Region: Jakarta; Umum di: Indonesia",
+                region: "Jakarta",
+                availability: "Indonesia",
+                origin: "Jakarta",
+                is_general: 1,
+                "kalori (kkal)": 310,
+                "protein (g)": 12.5,
+                "karbohidrat (g)": 28.3,
+                "lemak (g)": 16.8,
+                "lemak jenuh (g)": 2.8,
+                "lemak tak jenuh ganda (g)": 7.5,
+                "lemak tak jenuh tunggal (g)": 6.5,
+                "kolesterol (mg)": 0,
+                "serat (g)": 7.2,
+                "gula (g)": 3.1,
+                "sodium (mg)": 520,
+                "kalium (mg)": 685
+            },
+            {
+                id: 3,
+                nama_makanan: "Rendang",
+                label_daerah: "Region: Padang; Umum di: Indonesia; Asli: Sumatera Barat",
+                region: "Padang",
+                availability: "Indonesia",
+                origin: "Sumatera Barat",
+                is_general: 1,
+                "kalori (kkal)": 468,
+                "protein (g)": 32.5,
+                "karbohidrat (g)": 7.8,
+                "lemak (g)": 35.2,
+                "lemak jenuh (g)": 18.1,
+                "lemak tak jenuh ganda (g)": 1.6,
+                "lemak tak jenuh tunggal (g)": 15.5,
+                "kolesterol (mg)": 98,
+                "serat (g)": 1.5,
+                "gula (g)": 2.1,
+                "sodium (mg)": 312,
+                "kalium (mg)": 542
+            },
+            {
+                id: 4,
+                nama_makanan: "Sate Ayam",
+                label_daerah: "Region: General; Umum di: Indonesia",
+                region: "General",
+                availability: "Indonesia",
+                origin: "Indonesia",
+                is_general: 1,
+                "kalori (kkal)": 325,
+                "protein (g)": 27.3,
+                "karbohidrat (g)": 12.5,
+                "lemak (g)": 18.6,
+                "lemak jenuh (g)": 5.2,
+                "lemak tak jenuh ganda (g)": 4.8,
+                "lemak tak jenuh tunggal (g)": 8.6,
+                "kolesterol (mg)": 82,
+                "serat (g)": 0.7,
+                "gula (g)": 4.5,
+                "sodium (mg)": 430,
+                "kalium (mg)": 318
+            },
+            {
+                id: 5,
+                nama_makanan: "Soto Ayam",
+                label_daerah: "Region: General; Umum di: Indonesia",
+                region: "General",
+                availability: "Indonesia",
+                origin: "Indonesia",
+                is_general: 1,
+                "kalori (kkal)": 268,
+                "protein (g)": 18.2,
+                "karbohidrat (g)": 21.8,
+                "lemak (g)": 12.5,
+                "lemak jenuh (g)": 3.4,
+                "lemak tak jenuh ganda (g)": 3.2,
+                "lemak tak jenuh tunggal (g)": 5.9,
+                "kolesterol (mg)": 58,
+                "serat (g)": 1.3,
+                "gula (g)": 1.5,
+                "sodium (mg)": 612,
+                "kalium (mg)": 245
+            },
+            {
+                id: 6,
+                nama_makanan: "Bakso",
+                label_daerah: "Region: General; Umum di: Indonesia",
+                region: "General",
+                availability: "Indonesia",
+                origin: "Indonesia",
+                is_general: 1,
+                "kalori (kkal)": 218,
+                "protein (g)": 14.5,
+                "karbohidrat (g)": 18.7,
+                "lemak (g)": 9.8,
+                "lemak jenuh (g)": 4.2,
+                "lemak tak jenuh ganda (g)": 0.5,
+                "lemak tak jenuh tunggal (g)": 5.1,
+                "kolesterol (mg)": 45,
+                "serat (g)": 0.8,
+                "gula (g)": 1.0,
+                "sodium (mg)": 780,
+                "kalium (mg)": 210
+            },
+            {
+                id: 7,
+                nama_makanan: "Nasi Uduk",
+                label_daerah: "Region: Jakarta; Umum di: Indonesia",
+                region: "Jakarta",
+                availability: "Indonesia",
+                origin: "Jakarta",
+                is_general: 1,
+                "kalori (kkal)": 310,
+                "protein (g)": 5.3,
+                "karbohidrat (g)": 54.2,
+                "lemak (g)": 9.1,
+                "lemak jenuh (g)": 5.6,
+                "lemak tak jenuh ganda (g)": 0.8,
+                "lemak tak jenuh tunggal (g)": 2.7,
+                "kolesterol (mg)": 0,
+                "serat (g)": 0.5,
+                "gula (g)": 0.2,
+                "sodium (mg)": 412,
+                "kalium (mg)": 98
+            },
+            {
+                id: 8,
+                nama_makanan: "Ayam Betutu",
+                label_daerah: "Region: Bali; Asli: Bali",
+                region: "Bali",
+                availability: "Specific",
+                origin: "Bali",
+                is_general: 0,
+                "kalori (kkal)": 380,
+                "protein (g)": 32.1,
+                "karbohidrat (g)": 12.5,
+                "lemak (g)": 22.4,
+                "lemak jenuh (g)": 6.1,
+                "lemak tak jenuh ganda (g)": 5.3,
+                "lemak tak jenuh tunggal (g)": 11.0,
+                "kolesterol (mg)": 105,
+                "serat (g)": 3.8,
+                "gula (g)": 2.5,
+                "sodium (mg)": 510,
+                "kalium (mg)": 520
+            },
+            {
+                id: 9,
+                nama_makanan: "Gudeg",
+                label_daerah: "Region: Yogyakarta; Asli: Yogyakarta",
+                region: "Yogyakarta",
+                availability: "Specific",
+                origin: "Yogyakarta",
+                is_general: 0,
+                "kalori (kkal)": 320,
+                "protein (g)": 8.5,
+                "karbohidrat (g)": 40.3,
+                "lemak (g)": 14.8,
+                "lemak jenuh (g)": 9.2,
+                "lemak tak jenuh ganda (g)": 1.3,
+                "lemak tak jenuh tunggal (g)": 4.3,
+                "kolesterol (mg)": 24,
+                "serat (g)": 5.1,
+                "gula (g)": 18.2,
+                "sodium (mg)": 380,
+                "kalium (mg)": 610
+            },
+            {
+                id: 10,
+                nama_makanan: "Sate Padang",
+                label_daerah: "Region: Padang; Asli: Sumatera Barat",
+                region: "Padang",
+                availability: "Specific",
+                origin: "Sumatera Barat",
+                is_general: 0,
+                "kalori (kkal)": 342,
+                "protein (g)": 25.8,
+                "karbohidrat (g)": 15.2,
+                "lemak (g)": 20.3,
+                "lemak jenuh (g)": 8.7,
+                "lemak tak jenuh ganda (g)": 1.9,
+                "lemak tak jenuh tunggal (g)": 9.7,
+                "kolesterol (mg)": 78,
+                "serat (g)": 1.2,
+                "gula (g)": 3.8,
+                "sodium (mg)": 512,
+                "kalium (mg)": 285
+            },
+            {
+                id: 11,
+                nama_makanan: "Tahu",
+                label_daerah: "Region: General; Umum di: Indonesia",
+                region: "General",
+                availability: "Indonesia",
+                origin: "Indonesia",
+                is_general: 1,
+                "kalori (kkal)": 85,
+                "protein (g)": 9.3,
+                "karbohidrat (g)": 2.1,
+                "lemak (g)": 5.4,
+                "lemak jenuh (g)": 0.7,
+                "lemak tak jenuh ganda (g)": 2.1,
+                "lemak tak jenuh tunggal (g)": 2.6,
+                "kolesterol (mg)": 0,
+                "serat (g)": 1.2,
+                "gula (g)": 0.5,
+                "sodium (mg)": 8,
+                "kalium (mg)": 165
+            },
+            {
+                id: 12,
+                nama_makanan: "Tempeh",
+                label_daerah: "Region: General; Umum di: Indonesia; Asli: Jawa",
+                region: "General",
+                availability: "Indonesia",
+                origin: "Jawa",
+                is_general: 1,
+                "kalori (kkal)": 160,
+                "protein (g)": 16.8,
+                "karbohidrat (g)": 7.5,
+                "lemak (g)": 9.1,
+                "lemak jenuh (g)": 1.5,
+                "lemak tak jenuh ganda (g)": 4.3,
+                "lemak tak jenuh tunggal (g)": 3.3,
+                "kolesterol (mg)": 0,
+                "serat (g)": 4.8,
+                "gula (g)": 2.3,
+                "sodium (mg)": 12,
+                "kalium (mg)": 325
+            },
+            {
+                id: 13,
+                nama_makanan: "Sayur Asem",
+                label_daerah: "Region: Jakarta; Umum di: Indonesia; Asli: Jawa Barat",
+                region: "Jakarta",
+                availability: "Indonesia",
+                origin: "Jawa Barat",
+                is_general: 1,
+                "kalori (kkal)": 85,
+                "protein (g)": 2.5,
+                "karbohidrat (g)": 15.3,
+                "lemak (g)": 1.8,
+                "lemak jenuh (g)": 0.3,
+                "lemak tak jenuh ganda (g)": 0.5,
+                "lemak tak jenuh tunggal (g)": 1.0,
+                "kolesterol (mg)": 0,
+                "serat (g)": 4.2,
+                "gula (g)": 3.5,
+                "sodium (mg)": 325,
+                "kalium (mg)": 280
+            },
+            {
+                id: 14,
+                nama_makanan: "Pempek",
+                label_daerah: "Region: Palembang; Asli: Sumatera Selatan",
+                region: "Palembang",
+                availability: "Specific",
+                origin: "Sumatera Selatan",
+                is_general: 0,
+                "kalori (kkal)": 215,
+                "protein (g)": 12.3,
+                "karbohidrat (g)": 28.5,
+                "lemak (g)": 6.2,
+                "lemak jenuh (g)": 1.1,
+                "lemak tak jenuh ganda (g)": 1.8,
+                "lemak tak jenuh tunggal (g)": 3.3,
+                "kolesterol (mg)": 105,
+                "serat (g)": 0.6,
+                "gula (g)": 0.5,
+                "sodium (mg)": 510,
+                "kalium (mg)": 168
+            },
+            {
+                id: 15,
+                nama_makanan: "Rujak Cingur",
+                label_daerah: "Region: Surabaya; Asli: Jawa Timur",
+                region: "Surabaya",
+                availability: "Specific",
+                origin: "Jawa Timur",
+                is_general: 0,
+                "kalori (kkal)": 235,
+                "protein (g)": 14.5,
+                "karbohidrat (g)": 22.3,
+                "lemak (g)": 11.2,
+                "lemak jenuh (g)": 3.8,
+                "lemak tak jenuh ganda (g)": 1.5,
+                "lemak tak jenuh tunggal (g)": 5.9,
+                "kolesterol (mg)": 65,
+                "serat (g)": 5.8,
+                "gula (g)": 12.5,
+                "sodium (mg)": 380,
+                "kalium (mg)": 520
+            }
+        ];
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Initialize the user interface
+            initializeUI();
+            
+            // Load sample data
+            foodDatabase = sampleFoodDatabase;
+            
+            // Mock loading the TensorFlow.js model
+            await mockLoadModel();
+            
+            // Update the UI with current date data
+            updateDateDisplay();
+            loadFoodHistoryForDate(formatDate(currentDate));
+            updateNutritionSummary();
+            updateHealthAssessment();
+            updateFoodOriginAnalysis();
+            
+            // Generate initial recommendations if there are food items
+            if (currentFoods.length > 0) {
+                generateRecommendations();
+            }
+            
+            // Update weekly chart
+            updateWeeklyChart();
+        });
+
+        // Mock loading the model (in a real app, you would load the actual TF.js model)
+        async function mockLoadModel() {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    // In a real app, we would load the actual model
+                    model = {
+                        predict: function(input) {
+                            // Mock prediction function
+                            // This would use the TF.js model in a real app
+                            return tf.tensor([[0.5, 0.3, 0.8, 0.4, 0.6, 0.7, 0.2, 0.9, 0.1, 0.5, 0.3, 0.7]]);
+                        }
+                    };
+                    
+                    // Mock scalers and metadata
+                    X_scaler = {
+                        transform: function(input) {
+                            // Mock transform function
+                            return input;
+                        }
+                    };
+                    
+                    y_scaler = {
+                        inverse_transform: function(input) {
+                            // Mock inverse_transform function
+                            return input;
+                        }
+                    };
+                    
+                    nutritionalCols = [
+                        'kalori (kkal)', 'protein (g)', 'karbohidrat (g)', 'lemak (g)', 
+                        'lemak jenuh (g)', 'lemak tak jenuh ganda (g)', 'lemak tak jenuh tunggal (g)',
+                        'kolesterol (mg)', 'serat (g)', 'gula (g)', 'sodium (mg)', 'kalium (mg)'
+                    ];
+                    
+                    dailyRequirements = DEFAULT_DAILY_REQUIREMENTS;
+                    
+                    resolve();
+                }, 1000);
+            });
+        }
+
+        // Initialize the UI and event listeners
+        function initializeUI() {
+            // Set up event listeners for date navigation
+            document.getElementById('prev-day').addEventListener('click', function() {
+                currentDate.setDate(currentDate.getDate() - 1);
+                updateDateDisplay();
+                loadFoodHistoryForDate(formatDate(currentDate));
+                updateNutritionSummary();
+                updateHealthAssessment();
+                updateFoodOriginAnalysis();
+                updateRecommendationsVisibility();
+            });
+            
+            document.getElementById('next-day').addEventListener('click', function() {
+                // Don't allow navigation to future dates
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                if (currentDate < tomorrow) {
+                    currentDate.setDate(currentDate.getDate() + 1);
+                    updateDateDisplay();
+                    loadFoodHistoryForDate(formatDate(currentDate));
+                    updateNutritionSummary();
+                    updateHealthAssessment();
+                    updateFoodOriginAnalysis();
+                    updateRecommendationsVisibility();
+                }
+            });
+            
+            document.getElementById('today-btn').addEventListener('click', function() {
+                currentDate = new Date();
+                updateDateDisplay();
+                loadFoodHistoryForDate(formatDate(currentDate));
+                updateNutritionSummary();
+                updateHealthAssessment();
+                updateFoodOriginAnalysis();
+                updateRecommendationsVisibility();
+            });
+            
+            // Set up event listeners for food adding
+            document.getElementById('add-food-btn').addEventListener('click', showAddFoodModal);
+            document.getElementById('log-food-btn').addEventListener('click', showAddFoodModal);
+            
+            // Set up event listeners for the add food modal
+            document.getElementById('close-modal').addEventListener('click', hideAddFoodModal);
+            document.getElementById('cancel-add-food').addEventListener('click', hideAddFoodModal);
+            document.getElementById('confirm-add-food').addEventListener('click', addFoodToLog);
+            
+            // Set up food search functionality
+            document.getElementById('food-search').addEventListener('input', searchFoods);
+            
+            // Set up quantity selector
+            document.getElementById('decrease-quantity').addEventListener('click', function() {
+                const quantityInput = document.getElementById('food-quantity');
+                let currentValue = parseFloat(quantityInput.value);
+                if (currentValue > 0.25) {
+                    quantityInput.value = (currentValue - 0.25).toFixed(2);
+                    updateNutritionPreview();
+                }
+            });
+            
+            document.getElementById('increase-quantity').addEventListener('click', function() {
+                const quantityInput = document.getElementById('food-quantity');
+                let currentValue = parseFloat(quantityInput.value);
+                quantityInput.value = (currentValue + 0.25).toFixed(2);
+                updateNutritionPreview();
+            });
+            
+            document.getElementById('food-quantity').addEventListener('change', updateNutritionPreview);
+            
+            // Set up recommendations refresh button
+            document.getElementById('refresh-recommendations').addEventListener('click', function() {
+                if (currentFoods.length > 0) {
+                    generateRecommendations();
+                }
+            });
+            
+            // Set up user location selector
+            document.getElementById('user-location').addEventListener('change', function() {
+                userLocation = this.value;
+                if (currentFoods.length > 0) {
+                    generateRecommendations();
+                }
+                updateFoodOriginAnalysis();
+            });
+            
+            // Initialize tooltip functionality
+            initializeTooltips();
+            
+            // Initialize empty data structures
+            foodHistory = {};
+            
+            // Initialize weekly chart
+            initializeWeeklyChart();
+            
+            // Create the detailed nutrition table
+            createNutritionTable();
+        }
+
+        // Update the date display
+        function updateDateDisplay() {
+            const dateElement = document.getElementById('current-date');
+            dateElement.textContent = currentDate.toLocaleDateString('en-US', { 
+                month: 'long', 
+                day: 'numeric', 
+                year: 'numeric' 
+            });
+            
+            // Disable next button if it's current date
+            const nextButton = document.getElementById('next-day');
+            const today = new Date();
+            if (currentDate.setHours(0, 0, 0, 0) >= today.setHours(0, 0, 0, 0)) {
+                nextButton.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+            
+            // Reset the hours that were zeroed by the comparison
+            currentDate = new Date(currentDate);
+        }
+
+        // Format date as string (YYYY-MM-DD)
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Load food history for a specific date
+        function loadFoodHistoryForDate(dateString) {
+            // In a real app, this would load from localStorage or a database
+            if (!foodHistory[dateString]) {
+                // If no history for this date, initialize with empty array
+                foodHistory[dateString] = [];
+                
+                // For demo purposes, add some sample data for today's date
+                const today = formatDate(new Date());
+                if (dateString === today && Object.keys(foodHistory).length === 1) {
+                    foodHistory[dateString] = [
+                        { foodId: 1, name: "Nasi Goreng", quantity: 1, timestamp: new Date().setHours(8, 30) },
+                        { foodId: 11, name: "Tahu", quantity: 2, timestamp: new Date().setHours(12, 15) }
+                    ];
+                }
+                
+                // For demo purposes, add some sample data for yesterday
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayStr = formatDate(yesterday);
+                
+                if (dateString === yesterdayStr && !foodHistory[yesterdayStr]) {
+                    foodHistory[yesterdayStr] = [
+                        { foodId: 5, name: "Soto Ayam", quantity: 1, timestamp: new Date(yesterday).setHours(7, 45) },
+                        { foodId: 12, name: "Tempeh", quantity: 1, timestamp: new Date(yesterday).setHours(12, 0) },
+                        { foodId: 2, name: "Gado-gado", quantity: 0.5, timestamp: new Date(yesterday).setHours(18, 30) }
+                    ];
+                }
+            }
+            
+            // Load the food items for this date
+            currentFoods = foodHistory[dateString] || [];
+            
+            // Update the food log display
+            updateFoodLog();
+        }
+
+        // Update the food log display
+        function updateFoodLog() {
+            const foodLogContainer = document.getElementById('food-log-container');
+            const foodLogEmpty = document.getElementById('food-log-empty');
+            const foodLogList = document.getElementById('food-log-list');
+            const totalItems = document.getElementById('total-items');
+            
+            // Update total items count
+            totalItems.textContent = currentFoods.length;
+            
+            // Clear previous food log
+            foodLogList.innerHTML = '';
+            
+            // Show empty state if no foods
+            if (currentFoods.length === 0) {
+                foodLogEmpty.classList.remove('hidden');
+                foodLogList.classList.add('hidden');
+                return;
+            }
+            
+            // Hide empty state and show list
+            foodLogEmpty.classList.add('hidden');
+            foodLogList.classList.remove('hidden');
+            
+            // Sort food items by timestamp
+            const sortedFoods = [...currentFoods].sort((a, b) => a.timestamp - b.timestamp);
+            
+            // Group food items by mealtime
+            const breakfast = sortedFoods.filter(food => {
+                const date = new Date(food.timestamp);
+                const hours = date.getHours();
+                return hours >= 5 && hours < 11;
+            });
+            
+            const lunch = sortedFoods.filter(food => {
+                const date = new Date(food.timestamp);
+                const hours = date.getHours();
+                return hours >= 11 && hours < 15;
+            });
+            
+            const dinner = sortedFoods.filter(food => {
+                const date = new Date(food.timestamp);
+                const hours = date.getHours();
+                return hours >= 15 && hours < 22;
+            });
+            
+            const snacks = sortedFoods.filter(food => {
+                const date = new Date(food.timestamp);
+                const hours = date.getHours();
+                return hours < 5 || hours >= 22;
+            });
+            
+            // Add meal sections
+            if (breakfast.length > 0) {
+                addMealSection(foodLogList, 'Breakfast', breakfast, 'fa-coffee');
+            }
+            
+            if (lunch.length > 0) {
+                addMealSection(foodLogList, 'Lunch', lunch, 'fa-hamburger');
+            }
+            
+            if (dinner.length > 0) {
+                addMealSection(foodLogList, 'Dinner', dinner, 'fa-utensils');
+            }
+            
+            if (snacks.length > 0) {
+                addMealSection(foodLogList, 'Snacks', snacks, 'fa-cookie-bite');
+            }
+        }
+
+        // Add a meal section to the food log
+        function addMealSection(container, mealName, foods, iconClass) {
+            const mealSection = document.createElement('div');
+            mealSection.className = 'mb-4';
+            
+            const mealHeader = document.createElement('div');
+            mealHeader.className = 'flex items-center mb-2 pb-1 border-b border-gray-200';
+            mealHeader.innerHTML = `
+                <i class="fas ${iconClass} text-gray-600 mr-2"></i>
+                <span class="text-sm font-medium text-gray-600">${mealName}</span>
+            `;
+            
+            mealSection.appendChild(mealHeader);
+            
+            const foodItems = document.createElement('div');
+            foodItems.className = 'space-y-2';
+            
+            foods.forEach(food => {
+                const foodData = foodDatabase.find(f => f.id === food.foodId);
+                if (!foodData) return;
+                
+                const foodItem = document.createElement('div');
+                foodItem.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors';
+                
+                let regionBadge = '';
+                if (foodData.region !== 'General' && foodData.region !== 'Unknown') {
+                    regionBadge = `<span class="text-xs bg-green-100 text-green-800 rounded-full px-2 py-0.5">${foodData.region}</span>`;
+                }
+                
+                foodItem.innerHTML = `
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 mr-3">
+                            <i class="fas fa-utensils"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center">
+                                <h4 class="font-medium text-gray-800">${food.name}</h4>
+                                <span class="ml-2">${regionBadge}</span>
+                            </div>
+                            <p class="text-xs text-gray-600">
+                                ${food.quantity} serving(s) · ${foodData['kalori (kkal)'] * food.quantity} kcal
+                            </p>
+                        </div>
+                    </div>
+                    <button class="delete-food text-gray-400 hover:text-red-500" data-food-id="${food.foodId}" data-timestamp="${food.timestamp}">
+                        <i class="fas fa-times-circle"></i>
+                    </button>
+                `;
+                
+                foodItems.appendChild(foodItem);
+            });
+            
+            mealSection.appendChild(foodItems);
+            container.appendChild(mealSection);
+            
+            // Add event listeners for delete buttons
+            mealSection.querySelectorAll('.delete-food').forEach(button => {
+                button.addEventListener('click', function() {
+                    const foodId = parseInt(this.getAttribute('data-food-id'));
+                    const timestamp = parseInt(this.getAttribute('data-timestamp'));
+                    removeFoodFromLog(foodId, timestamp);
+                });
+            });
+        }
+
+        // Remove a food item from the log
+        function removeFoodFromLog(foodId, timestamp) {
+            const dateString = formatDate(currentDate);
+            
+            // Find the index of the food item to remove
+            const index = currentFoods.findIndex(food => 
+                food.foodId === foodId && food.timestamp === timestamp
+            );
+            
+            if (index !== -1) {
+                // Remove the food item
+                currentFoods.splice(index, 1);
+                
+                // Update the food history
+                foodHistory
